@@ -6,6 +6,7 @@ const {
   update,
   remove,
   getLink,
+  download,
 } = require("../controllers/documentController");
 
 const router = express.Router();
@@ -20,6 +21,6 @@ router.post("/upload", authGuard, uploadMiddleware.single("file"), upload);
 router.put("/:docId", authGuard, update);
 router.delete("/:docId", authGuard, remove);
 router.get("/:docId", authGuard, getLink);
+router.get("/:docId/download", authGuard, download);
 
 module.exports = router;
-

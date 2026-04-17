@@ -8,10 +8,16 @@ const documentSchema = new mongoose.Schema(
     },
     objectName: {
       type: String,
-      required: true,
+      default: null,
     },
     contentType: String,
     size: Number,
+    storageProvider: {
+      type: String,
+      enum: ["minio", "mongo"],
+      default: "minio",
+    },
+    fileData: Buffer,
     uploadedBy: {
       id: String,
       email: String,
@@ -28,4 +34,3 @@ const documentSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model("Document", documentSchema);
-

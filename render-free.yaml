@@ -1,0 +1,75 @@
+services:
+  - type: web
+    name: battery-passport-auth-api
+    runtime: docker
+    plan: free
+    repo: https://github.com/Akhilesh29/Microservices-Backend-for-Battery-Passport-Platform.git
+    branch: main
+    dockerfilePath: ./auth-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        sync: false
+      - key: MONGO_URI
+        sync: false
+
+  - type: web
+    name: battery-passport-data-api
+    runtime: docker
+    plan: free
+    repo: https://github.com/Akhilesh29/Microservices-Backend-for-Battery-Passport-Platform.git
+    branch: main
+    dockerfilePath: ./data-access-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        fromService:
+          type: web
+          name: battery-passport-auth-api
+          envVarKey: JWT_SECRET
+      - key: AUTH_SERVICE_HOST
+        fromService:
+          type: web
+          name: battery-passport-auth-api
+          property: host
+      - key: AUTH_SERVICE_PORT
+        value: 10000
+      - key: MONGO_URI
+        sync: false
+      - key: KAFKA_DISABLED
+        value: true
+
+  - type: web
+    name: battery-passport-document-api
+    runtime: docker
+    plan: free
+    repo: https://github.com/Akhilesh29/Microservices-Backend-for-Battery-Passport-Platform.git
+    branch: main
+    dockerfilePath: ./document-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        fromService:
+          type: web
+          name: battery-passport-auth-api
+          envVarKey: JWT_SECRET
+      - key: AUTH_SERVICE_HOST
+        fromService:
+          type: web
+          name: battery-passport-auth-api
+          property: host
+      - key: AUTH_SERVICE_PORT
+        value: 10000
+      - key: MONGO_URI
+        sync: false
+      - key: STORAGE_PROVIDER
+        value: mongo

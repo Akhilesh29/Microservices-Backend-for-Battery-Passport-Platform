@@ -4,4 +4,4 @@ node_modules/
 coverage/
 logs/
 notification-service/logs/*.txt
-
+.tools/

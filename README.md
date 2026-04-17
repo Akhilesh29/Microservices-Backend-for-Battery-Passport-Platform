@@ -2,6 +2,11 @@
 
 This repository contains a simplified microservices-based backend system for a digital battery passport platform. The stack includes Node.js, Express, MongoDB, Kafka, JWT authentication, and MinIO as an S3-compatible object store.
 
+The repository supports two deployment modes:
+
+- `Full local stack`: Docker Compose with MongoDB, Kafka, MinIO, and all four services
+- `Hosted API-only demo`: three web APIs for free-tier hosting, with Mongo-backed document storage and mocked event handling instead of Kafka
+
 ## Service Descriptions
 
 - `auth-service`: user registration, login, JWT issuance, and internal token verification
@@ -36,7 +41,9 @@ The included `.env.example` already contains working defaults for local Docker u
 - `MONGO_ROOT_USERNAME`, `MONGO_ROOT_PASSWORD`, `MONGO_HOST`, `MONGO_PORT`: MongoDB connection settings
 - `AUTH_DB`, `PASSPORT_DB`, `DOCUMENT_DB`: per-service MongoDB database names
 - `KAFKA_BROKER`, `KAFKA_CLIENT_ID`, `KAFKA_GROUP_ID`, `KAFKA_TOPIC_PASSPORT_EVENTS`: Kafka settings
+- `KAFKA_DISABLED`: disables Kafka publishing and falls back to local mock event logging
 - `MINIO_ENDPOINT`, `MINIO_PORT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET`, `MINIO_USE_SSL`: S3-compatible storage settings
+- `STORAGE_PROVIDER`: `minio` for S3-compatible storage or `mongo` for hosted API-only mode
 - `AUTH_SERVICE_URL`: internal auth verification URL used by other services
 - `NOTIFICATION_OUTPUT_DIR`: directory used by the notification service for log files
 
@@ -204,6 +211,14 @@ Example response:
 
 Returns a signed MinIO download URL.
 
+When `STORAGE_PROVIDER=mongo`, this endpoint returns an API download URL instead.
+
+#### Download File In Mongo Storage Mode
+
+`GET /api/documents/:docId/download`
+
+This endpoint is used by the hosted API-only mode when documents are stored directly in MongoDB instead of MinIO.
+
 ## Kafka Topics And Payload Structure
 
 ### Topic
@@ -238,6 +253,8 @@ The data-access service publishes JSON messages in this shape:
 
 The notification service subscribes to `passport-events`, filters `passport.*` events, and writes notification output to text files in the configured logs directory.
 
+When `KAFKA_DISABLED=true`, the data-access service logs the same event payload locally instead of publishing to Kafka. This is the behavior used by the free hosted API-only deployment.
+
 ## Render Deployment
 
 This repository now includes a [`render.yaml`](./render.yaml) Blueprint for a Render-based deployment path.
@@ -250,3 +267,41 @@ Important notes:
 - The Blueprint provisions custom MongoDB, Kafka, and MinIO services plus the four Node services.
 - Persistent disks on Render require paid service plans.
 - Render Blueprint files do not support variable interpolation, so the application also supports split host and port environment variables for internal service discovery.
+
+## Render Free API-Only Deployment
+
+This repository also includes [`render-free.yaml`](./render-free.yaml) for a free-tier hosted demo deployment that exposes only the HTTP APIs:
+
+- `battery-passport-auth-api`
+- `battery-passport-data-api`
+- `battery-passport-document-api`
+
+This mode is designed for free hosting and makes these tradeoffs:
+
+- Kafka is disabled with `KAFKA_DISABLED=true`
+- Notifications are mocked by logging events in the data-access service
+- Document files are stored directly in MongoDB with `STORAGE_PROVIDER=mongo`
+- The standalone notification worker is not deployed
+- MinIO is not deployed
+
+### What you need for the free hosted mode
+
+- A free MongoDB Atlas cluster
+- Three MongoDB connection strings, one per service database:
+  - auth service: `.../auth_db`
+  - passport service: `.../passport_db`
+  - document service: `.../document_db`
+- A shared `JWT_SECRET`
+
+### Deploying the free hosted mode on Render
+
+1. In Render, create a new Blueprint deployment from this repo.
+2. Select `render-free.yaml`.
+3. When prompted, provide:
+   - `JWT_SECRET`
+   - `MONGO_URI` for `battery-passport-auth-api`
+   - `MONGO_URI` for `battery-passport-data-api`
+   - `MONGO_URI` for `battery-passport-document-api`
+4. Finish the Blueprint creation flow.
+
+This free mode is the simplest way to host the APIs publicly without paid private services, workers, Kafka, or MinIO.

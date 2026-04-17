@@ -3,6 +3,7 @@ const {
   updateDocumentMetadata,
   deleteDocument,
   getDocumentLink,
+  getStoredDocument,
 } = require("../services/documentService");
 
 async function upload(req, res, next) {
@@ -59,11 +60,33 @@ async function getLink(req, res, next) {
       return res.status(404).json({ message: "Document not found" });
     }
 
+    const downloadUrl =
+      result.downloadUrl ||
+      `${req.protocol}://${req.get("host")}/api/documents/${result.document.id}/download`;
+
     res.status(200).json({
       docId: result.document.id,
       fileName: result.document.fileName,
-      downloadUrl: result.downloadUrl,
+      downloadUrl,
     });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function download(req, res, next) {
+  try {
+    const document = await getStoredDocument(req.params.docId);
+    if (!document) {
+      return res.status(404).json({ message: "Document not found for direct download" });
+    }
+
+    res.setHeader("Content-Type", document.contentType || "application/octet-stream");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${document.fileName}"`
+    );
+    res.status(200).send(document.fileData);
   } catch (error) {
     next(error);
   }
@@ -74,5 +97,5 @@ module.exports = {
   update,
   remove,
   getLink,
+  download,
 };
-
