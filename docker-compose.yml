@@ -1,0 +1,113 @@
+services:
+  mongo:
+    image: mongo:7
+    container_name: mongo
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    restart: unless-stopped
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    restart: unless-stopped
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    container_name: minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+  auth-service:
+    build:
+      context: .
+      dockerfile: auth-service/Dockerfile
+    container_name: auth-service
+    restart: unless-stopped
+    depends_on:
+      - mongo
+    env_file:
+      - .env
+    ports:
+      - "${AUTH_PORT:-3001}:3001"
+
+  data-access-service:
+    build:
+      context: .
+      dockerfile: data-access-service/Dockerfile
+    container_name: data-access-service
+    restart: unless-stopped
+    depends_on:
+      - mongo
+      - kafka
+      - auth-service
+    env_file:
+      - .env
+    ports:
+      - "${PASSPORT_PORT:-3002}:3002"
+
+  document-service:
+    build:
+      context: .
+      dockerfile: document-service/Dockerfile
+    container_name: document-service
+    restart: unless-stopped
+    depends_on:
+      - mongo
+      - minio
+      - auth-service
+    env_file:
+      - .env
+    ports:
+      - "${DOCUMENT_PORT:-3003}:3003"
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: notification-service/Dockerfile
+    container_name: notification-service
+    restart: unless-stopped
+    depends_on:
+      - kafka
+    env_file:
+      - .env
+    ports:
+      - "${NOTIFICATION_PORT:-3004}:3004"
+    volumes:
+      - ./notification-service/logs:/app/logs
+
+volumes:
+  mongo_data:
+  minio_data:
+
