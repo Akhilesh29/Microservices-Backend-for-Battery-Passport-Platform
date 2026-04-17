@@ -6,6 +6,7 @@ COPY shared ./shared
 WORKDIR /app/shared
 RUN npm install
 
+WORKDIR /app
 COPY document-service/package*.json ./document-service/
 WORKDIR /app/document-service
 RUN npm install

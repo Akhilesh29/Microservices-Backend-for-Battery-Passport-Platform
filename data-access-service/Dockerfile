@@ -6,6 +6,7 @@ COPY shared ./shared
 WORKDIR /app/shared
 RUN npm install
 
+WORKDIR /app
 COPY data-access-service/package*.json ./data-access-service/
 WORKDIR /app/data-access-service
 RUN npm install
