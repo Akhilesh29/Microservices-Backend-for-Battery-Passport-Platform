@@ -1,0 +1,193 @@
+services:
+  - type: pserv
+    name: battery-passport-mongo
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/mongo:7
+    dockerCommand: >
+      bash -lc "docker-entrypoint.sh mongod --bind_ip 0.0.0.0 --port 27017"
+    disk:
+      name: mongo-data
+      mountPath: /data/db
+      sizeGB: 10
+
+  - type: pserv
+    name: battery-passport-minio
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/minio/minio:RELEASE.2024-12-18T13-15-44Z
+    dockerCommand: server /data --console-address ":9001"
+    envVars:
+      - key: MINIO_ROOT_USER
+        value: minioadmin
+      - key: MINIO_ROOT_PASSWORD
+        generateValue: true
+    disk:
+      name: minio-data
+      mountPath: /data
+      sizeGB: 10
+
+  - type: pserv
+    name: battery-passport-kafka
+    runtime: image
+    plan: starter
+    image:
+      url: docker.io/apache/kafka:latest
+    dockerCommand: >
+      bash -lc "export CLUSTER_ID=${KAFKA_CLUSTER_ID};
+      export KAFKA_NODE_ID=1;
+      export KAFKA_PROCESS_ROLES=broker,controller;
+      export KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093;
+      export KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://$RENDER_DISCOVERY_SERVICE:9092;
+      export KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT;
+      export KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT;
+      export KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER;
+      export KAFKA_CONTROLLER_QUORUM_VOTERS=1@$RENDER_DISCOVERY_SERVICE:9093;
+      export KAFKA_LOG_DIRS=/var/lib/kafka/data;
+      export KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1;
+      export KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1;
+      export KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1;
+      /etc/kafka/docker/run"
+    envVars:
+      - key: KAFKA_CLUSTER_ID
+        value: MkU3OEVBNTcwNTJENDM2Qk
+    disk:
+      name: kafka-data
+      mountPath: /var/lib/kafka/data
+      sizeGB: 10
+
+  - type: web
+    name: battery-passport-auth-service
+    runtime: docker
+    plan: starter
+    repo: https://github.com/Akhilesh29/Microservices-Backend-for-Battery-Passport-Platform.git
+    branch: main
+    dockerfilePath: ./auth-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 3001
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGO_URI
+        value: mongodb://battery-passport-mongo:27017/auth_db
+
+  - type: web
+    name: battery-passport-data-service
+    runtime: docker
+    plan: starter
+    repo: https://github.com/Akhilesh29/Microservices-Backend-for-Battery-Passport-Platform.git
+    branch: main
+    dockerfilePath: ./data-access-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 3002
+      - key: JWT_SECRET
+        fromService:
+          type: web
+          name: battery-passport-auth-service
+          envVarKey: JWT_SECRET
+      - key: AUTH_SERVICE_HOST
+        fromService:
+          type: web
+          name: battery-passport-auth-service
+          property: host
+      - key: AUTH_SERVICE_PORT
+        value: 3001
+      - key: MONGO_URI
+        value: mongodb://battery-passport-mongo:27017/passport_db
+      - key: KAFKA_HOST
+        fromService:
+          type: pserv
+          name: battery-passport-kafka
+          property: host
+      - key: KAFKA_PORT
+        value: 9092
+      - key: KAFKA_CLIENT_ID
+        value: battery-passport-platform
+      - key: KAFKA_TOPIC_PASSPORT_EVENTS
+        value: passport-events
+
+  - type: web
+    name: battery-passport-document-service
+    runtime: docker
+    plan: starter
+    repo: https://github.com/Akhilesh29/Microservices-Backend-for-Battery-Passport-Platform.git
+    branch: main
+    dockerfilePath: ./document-service/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 3003
+      - key: JWT_SECRET
+        fromService:
+          type: web
+          name: battery-passport-auth-service
+          envVarKey: JWT_SECRET
+      - key: AUTH_SERVICE_HOST
+        fromService:
+          type: web
+          name: battery-passport-auth-service
+          property: host
+      - key: AUTH_SERVICE_PORT
+        value: 3001
+      - key: MONGO_URI
+        value: mongodb://battery-passport-mongo:27017/document_db
+      - key: MINIO_ENDPOINT
+        fromService:
+          type: pserv
+          name: battery-passport-minio
+          property: host
+      - key: MINIO_PORT
+        value: 9000
+      - key: MINIO_USE_SSL
+        value: false
+      - key: MINIO_BUCKET
+        value: battery-passport-documents
+      - key: MINIO_ACCESS_KEY
+        fromService:
+          type: pserv
+          name: battery-passport-minio
+          envVarKey: MINIO_ROOT_USER
+      - key: MINIO_SECRET_KEY
+        fromService:
+          type: pserv
+          name: battery-passport-minio
+          envVarKey: MINIO_ROOT_PASSWORD
+
+  - type: worker
+    name: battery-passport-notification-service
+    runtime: docker
+    plan: starter
+    repo: https://github.com/Akhilesh29/Microservices-Backend-for-Battery-Passport-Platform.git
+    branch: main
+    dockerfilePath: ./notification-service/Dockerfile
+    dockerContext: .
+    envVars:
+      - key: PORT
+        value: 3004
+      - key: KAFKA_HOST
+        fromService:
+          type: pserv
+          name: battery-passport-kafka
+          property: host
+      - key: KAFKA_PORT
+        value: 9092
+      - key: KAFKA_CLIENT_ID
+        value: battery-passport-platform
+      - key: KAFKA_GROUP_ID
+        value: notification-service-group
+      - key: KAFKA_TOPIC_PASSPORT_EVENTS
+        value: passport-events
+      - key: NOTIFICATION_OUTPUT_DIR
+        value: /app/logs
+    disk:
+      name: notification-logs
+      mountPath: /app/logs
+      sizeGB: 1

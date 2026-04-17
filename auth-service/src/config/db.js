@@ -1,6 +1,12 @@
 const mongoose = require("mongoose");
 
 async function connectDB() {
+  if (process.env.MONGO_URI) {
+    await mongoose.connect(process.env.MONGO_URI);
+    console.log("Auth service connected to MongoDB");
+    return;
+  }
+
   const {
     MONGO_ROOT_USERNAME,
     MONGO_ROOT_PASSWORD,
@@ -17,4 +23,3 @@ async function connectDB() {
 module.exports = {
   connectDB,
 };
-

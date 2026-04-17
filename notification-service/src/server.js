@@ -2,7 +2,7 @@ require("dotenv").config();
 const app = require("./app");
 const { startPassportEventsConsumer } = require("./consumers/passportEventsConsumer");
 
-const port = process.env.NOTIFICATION_PORT || 3004;
+const port = process.env.PORT || process.env.NOTIFICATION_PORT || 3004;
 
 async function startServer() {
   await startPassportEventsConsumer();

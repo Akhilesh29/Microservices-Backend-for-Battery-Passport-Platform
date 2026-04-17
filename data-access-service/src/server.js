@@ -3,7 +3,7 @@ const app = require("./app");
 const { connectDB } = require("./config/db");
 const { connectProducer } = require("./config/kafka");
 
-const port = process.env.PASSPORT_PORT || 3002;
+const port = process.env.PORT || process.env.PASSPORT_PORT || 3002;
 
 async function startServer() {
   await connectDB();
@@ -17,4 +17,3 @@ startServer().catch((error) => {
   console.error("Data access service failed to start", error);
   process.exit(1);
 });
-

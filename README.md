@@ -33,3 +33,15 @@ docker compose up --build
 
 The data-access and document services validate bearer tokens by calling `POST /api/auth/verify` on the auth service over HTTP using the internal Docker service name.
 
+## Render Deployment
+
+This repository now includes a [`render.yaml`](./render.yaml) Blueprint for a Render-based deployment path.
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Akhilesh29/Microservices-Backend-for-Battery-Passport-Platform)
+
+Important notes:
+
+- Render is a better fit than Vercel for this project because it supports long-running containerized services.
+- The Blueprint provisions custom MongoDB, Kafka, and MinIO services plus the four Node services.
+- Persistent disks on Render require paid service plans.
+- Render Blueprint files do not support variable interpolation, so the application also supports split host and port environment variables for internal service discovery.
