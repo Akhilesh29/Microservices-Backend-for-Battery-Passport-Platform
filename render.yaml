@@ -4,7 +4,7 @@ services:
     runtime: image
     plan: starter
     image:
-      url: docker.io/mongo:7
+      url: docker.io/library/mongo:7
     dockerCommand: >
       bash -lc "docker-entrypoint.sh mongod --bind_ip 0.0.0.0 --port 27017"
     disk:
